@@ -26,8 +26,8 @@ Run `ng e2e` to execute the end-to-end tests via a platform of your choice. To u
 
 To get more help on the Angular CLI use `ng help` or go check out the [Angular CLI Overview and Command Reference](https://angular.io/cli) page.
 
-#Tutorial Steps
-###Change the application title
+# Tutorial Steps
+### Change the application title
 app.component.ts (class title property) |
 --- |
 `title = 'Tour of Heroes';` |
@@ -36,7 +36,7 @@ app.component.html (template) |
 --- |
 `<h1>{{title}}</h1>` |
 
-###Add application styles
+### Add application styles
 src/styles.css (excerpt) |
 --- |
 ```
@@ -65,7 +65,7 @@ body, input[type="text"], button {
 ```
 
 
-###Create the heroes component
+### Create the heroes component
 `$ ng generate component heroes`
 
 - Add a hero property to the HeroesComponent for a hero named "Windstorm."
@@ -120,7 +120,7 @@ export class HeroesComponent implements OnInit {
 
 }
 ```
-###Show the hero object
+### Show the hero object
 heroes.component.html (HeroesComponent's template) |
 --- |
 ```
@@ -128,7 +128,7 @@ heroes.component.html (HeroesComponent's template) |
 <div><span>id: </span>{{hero.id}}</div>
 <div><span>name: </span>{{hero.name}}</div>
 ```
-###Format with the UppercasePipe
+### Format with the UppercasePipe
 Modify the `hero.name` binding like this.
 src/app/heroes/heroes.component.html |
 --- |
@@ -137,11 +137,11 @@ src/app/heroes/heroes.component.html |
 ```
 **Pipes** are a good way to format strings, currency amounts, dates and other display data. Angular ships with several built-in pipes and you can create your own.
 
-###Edit the hero
+### Edit the hero
 Users should be able to edit the hero name in an `<input>` textbox.
 
 setup a **two-way data binding** between the `<input>` form element and the `hero.name` property.
-###Two-way binding
+### Two-way binding
 src/app/heroes/heroes.component.html (HeroesComponent's template) |
 --- |
 ```
@@ -153,7 +153,7 @@ src/app/heroes/heroes.component.html (HeroesComponent's template) |
 **`[(ngModel)]`** is Angular's two-way data binding syntax.
 
 ***Angular needs to know how the pieces of your application fit together and what other files and libraries the application requires. This information is called metadata.*** **(import FormsModule)**
-###Import FormsModule
+### Import FormsModule
 app.module.ts (FormsModule symbol import) |
 --- |
 ```
@@ -163,4 +163,92 @@ imports: [
     BrowserModule,
     FormsModule
   ],
+```
+
+### Create mock heroes
+For now, you'll create some mock heroes and pretend they came from the server.
+
+src/app/mock-heroes.ts |
+--- |
+```
+import { Hero } from './hero';
+
+export const HEROES: Hero[] = [
+  { id: 11, name: 'Dr Nice' },
+  { id: 12, name: 'Narco' },
+  { id: 13, name: 'Bombasto' },
+  { id: 14, name: 'Celeritas' },
+  { id: 15, name: 'Magneta' },
+  { id: 16, name: 'RubberMan' },
+  { id: 17, name: 'Dynama' },
+  { id: 18, name: 'Dr IQ' },
+  { id: 19, name: 'Magma' },
+  { id: 20, name: 'Tornado' }
+];
+```
+### Displaying heroes
+src/app/heroes/heroes.component.ts |
+--- |
+```
+import { HEROES } from '../mock-heroes';
+...
+export class HeroesComponent implements OnInit {
+  
+  heroes = HEROES;
+}
+```
+heroes.component.html (heroes template) |
+--- |
+```
+<h2>My Heroes</h2>
+<ul class="heroes">
+  <li *ngFor="let hero of heroes">
+    <span class="badge">{{hero.id}}</span> {{hero.name}}
+  </li>
+</ul>
+```
+### Add a click event
+***Binding***
+heroes.component.html (heroes template) |
+--- |
+```
+...
+<li *ngFor="let hero of heroes" (click)="onSelect(hero)">
+```
+***event handler***
+src/app/heroes/heroes.component.ts (onSelect) |
+--- |
+```
+...
+selectedHero?: Hero;
+onSelect(hero: Hero): void {
+  this.selectedHero = hero;
+}
+```
+
+### Add a details section
+To click on a hero on the list and reveal details about that hero, you need a section for the details to render in the template.
+
+heroes.component.html (selected hero details) |
+--- |
+```
+<div *ngIf="selectedHero">
+
+  <h2>{{selectedHero.name | uppercase}} Details</h2>
+  <div><span>id: </span>{{selectedHero.id}}</div>
+  <div>
+    <label for="hero-name">Hero name: </label>
+    <input id="hero-name" [(ngModel)]="selectedHero.name" placeholder="name">
+  </div>
+
+</div>
+```
+
+***Angular's class binding can add and remove a CSS class conditionally. Add [class.some-css-class]="some-condition" to the element you want to style.***
+
+Add the following `[class.selected]` binding to the `<li>` in the HeroesComponent template:
+heroes.component.html (toggle the 'selected' CSS class) |
+--- |
+```
+[class.selected]="hero === selectedHero"
 ```
