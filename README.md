@@ -252,3 +252,59 @@ heroes.component.html (toggle the 'selected' CSS class) |
 ```
 [class.selected]="hero === selectedHero"
 ```
+
+### Create a feature component
+
+At the moment, the HeroesComponent displays both the list of heroes and the selected hero's details.
+
+Keeping all features in one component as the application grows will not be maintainable. You'll want to split up large components into smaller sub-components, each focused on a specific task or workflow.
+
+- Use the Angular CLI to generate a new component named hero-detail.
+  `$ ng generate component hero-detail`
+
+src/app/hero-detail/hero-detail.component.html |
+--- |
+```
+<div *ngIf="hero">
+
+  <h2>{{hero.name | uppercase}} Details</h2>
+  <div><span>id: </span>{{hero.id}}</div>
+  <div>
+    <label for="hero-name">Hero name: </label>
+    <input id="hero-name" [(ngModel)]="hero.name" placeholder="name">
+  </div>
+
+</div>
+```
+### Add the @Input() hero property
+The hero property must be an Input property, annotated with the @Input() decorator, because the external HeroesComponent will bind to it like this.
+`<app-hero-detail [hero]="selectedHero"></app-hero-detail>`
+src/app/hero-detail/hero-detail.component.ts |
+--- |
+```
+import { Component, OnInit, Input } from '@angular/core';
+import { Hero } from '../hero';
+...
+@Input() hero?: Hero;
+```
+*This component only receives a hero object through its hero property and displays it.*
+
+### Update the HeroesComponent template
+heroes.component.html + (HeroDetail binding) |
+--- |
+```
+<h2>My Heroes</h2>
+
+<ul class="heroes">
+  <li *ngFor="let hero of heroes"
+    [class.selected]="hero === selectedHero"
+    (click)="onSelect(hero)">
+    <span class="badge">{{hero.id}}</span> {{hero.name}}
+  </li>
+</ul>
+
+<app-hero-detail [hero]="selectedHero"></app-hero-detail>
+```
+*The browser refreshes and the application starts working again as it did before.*
+
+https://angular.io/tutorial/toh-pt3
