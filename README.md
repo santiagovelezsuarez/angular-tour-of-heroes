@@ -307,4 +307,236 @@ heroes.component.html + (HeroDetail binding) |
 ```
 *The browser refreshes and the application starts working again as it did before.*
 
-https://angular.io/tutorial/toh-pt3
+### Add services
+The Tour of Heroes HeroesComponent is currently getting and displaying fake data.
+
+After the refactoring in this tutorial, HeroesComponent will be lean and focused on supporting the view. It will also be easier to unit-test with a mock service.
+
+Services are a great way to share information among classes that don't know each other. You'll create a ***MessageService*** and inject it in two places.
+
+`$ ng generate service hero`
+
+*Notice that the new service imports the Angular Injectable symbol and annotates the class with the **@Injectable()** decorator. This marks the class as one that participates in the dependency injection system.*
+
+### Get hero data
+The HeroService could get hero data from anywhere—a web service, local storage, or a mock data source.
+
+src/app/hero.service.ts |
+--- |
+```
+import { Injectable } from '@angular/core';
+import { Hero } from './hero';
+import { HEROES } from './mock-heroes';
+
+@Injectable({
+  providedIn: 'root'
+})
+export class HeroService {
+
+  constructor() { }
+
+  getHeroes(): Hero[] {
+    return HEROES;
+  }
+
+}
+```
+
+**Provide the HeroService**
+You must make the HeroService available to the dependency injection system before Angular can inject it into the HeroesComponent by registering a provider. A provider is something that can create or deliver a service; in this case, it instantiates the HeroService class to provide the service.
+```
+@Injectable({
+  providedIn: 'root',
+})
+```
+When you provide the service at the **root** level, Angular creates a single, shared instance of `HeroService` and injects into any class that asks for it.
+***The HeroService is now ready to plug into the HeroesComponent.***
+
+### Update HeroesComponent
+src/app/heroes/heroes.component.ts |
+--- |
+```
+...
+import { HeroService } from '../hero.service';
+...
+heroes: Hero[] = [];
+constructor(private heroService: HeroService) {}
+```
+The parameter simultaneously defines a private `heroService` property and identifies it as a `HeroService` injection site.
+
+When Angular creates a `HeroesComponent`, the Dependency Injection system sets the `heroService` parameter to the singleton instance of `HeroService`.
+
+***Create a method to retrieve the heroes from the service and Call it in ngOnInit()***
+src/app/heroes/heroes.component.ts |
+--- |
+```
+...
+ngOnInit() {
+  this.getHeroes();
+}
+...
+getHeroes(): void {
+  this.heroes = this.heroService.getHeroes();
+}
+```
+*After the browser refreshes, the application should run as before,*
+
+This will not work in a real application(The HeroService.getHeroes() method has a synchronous signature). You're getting away with it now because the service currently returns mock heroes. But soon the application will fetch heroes from a remote server, which is an inherently asynchronous operation.
+
+The `HeroService` must wait for the server to respond, `getHeroes()` cannot return immediately with hero data, and the browser will not block while the service waits.
+
+`HeroService.getHeroes()` must have an asynchronous signature of some kind.
+
+In this tutorial, `HeroService.getHeroes()` will return an `Observable` because it will eventually use the Angular `HttpClient.get` method to fetch the heroes and `HttpClient.get()` returns an `Observable`.
+
+`Observable` is one of the key classes in the RxJS library.
+
+`of(HEROES)` returns an `Observable<Hero[]>` that emits a single value, the array of mock heroes.
+src/app/hero.service.ts |
+--- |
+```
+import { Observable, of } from 'rxjs';
+...
+getHeroes(): Observable<Hero[]> {
+  const heroes = of(HEROES);
+  return heroes;
+}
+```
+***Subscribe in HeroesComponent***
+The `HeroService.getHeroes` method used to return a `Hero[]`. Now it returns an `Observable<Hero[]>`.
+
+You'll have to adjust to that difference in `HeroesComponent`.
+heroes.component.ts  |
+--- |
+```
+...
+getHeroes(): void {
+  this.heroService.getHeroes()
+      .subscribe(heroes => this.heroes = heroes);
+}
+```
+***This asynchronous approach will work when the HeroService requests heroes from the server.***
+
+### Show messages
+create the MessagesComponent.
+`$ ng generate component messages`
+
+Modify the `AppComponent` template
+src/app/app.component.html  |
+--- |
+```
+<h1>{{title}}</h1>
+<app-heroes></app-heroes>
+<app-messages></app-messages>
+```
+### Create the MessageService
+`$ ng generate service message`
+src/app/message.service.ts  |
+--- |
+```
+import { Injectable } from '@angular/core';
+
+@Injectable({
+  providedIn: 'root',
+})
+export class MessageService {
+  messages: string[] = [];
+
+  add(message: string) {
+    this.messages.push(message);
+  }
+
+  clear() {
+    this.messages = [];
+  }
+}
+```
+**Inject it into the HeroService**
+Angular will inject the singleton `MessageService` into that property when it creates the `HeroService`.
+src/app/hero.service.ts |
+--- |
+```
+...
+import { MessageService } from './message.service';
+...
+...
+constructor(private messageService: MessageService) { }
+```
+**Send a message from HeroService**
+Modify the getHeroes() method to send a message when the heroes are fetched.
+src/app/hero.service.ts |
+--- |
+```
+getHeroes(): Observable<Hero[]> {
+  const heroes = of(HEROES);
+  this.messageService.add('HeroService: fetched heroes');
+  return heroes;
+}
+```
+### Display the message from HeroService
+The MessagesComponent should display all messages, including the message sent by the HeroService when it fetches heroes.
+src/app/messages/messages.component.ts |
+--- |
+```
+...
+import { MessageService } from '../message.service';
+...
+constructor(public messageService: MessageService) {}
+```
+The messageService property must be **public** because you're going to bind to it in the template.(Angular only binds to public component properties.)
+
+### Bind to the MessageService
+src/app/messages/messages.component.html |
+--- |
+```
+<div *ngIf="messageService.messages.length">
+
+  <h2>Messages</h2>
+  <button class="clear"
+          (click)="messageService.clear()">Clear messages</button>
+  <div *ngFor='let message of messageService.messages'> {{message}} </div>
+
+</div>
+```
+### Add additional messages to hero service
+The following example shows how to send and display a message each time the user clicks on a hero, showing a history of the user's selections. 
+src/app/heroes/heroes.component.ts |
+--- |
+```
+import { Component, OnInit } from '@angular/core';
+
+import { Hero } from '../hero';
+import { HeroService } from '../hero.service';
+import { MessageService } from '../message.service';
+
+@Component({
+  selector: 'app-heroes',
+  templateUrl: './heroes.component.html',
+  styleUrls: ['./heroes.component.css']
+})
+export class HeroesComponent implements OnInit {
+
+  selectedHero?: Hero;
+
+  heroes: Hero[] = [];
+
+  constructor(private heroService: HeroService, private messageService: MessageService) { }
+
+  ngOnInit() {
+    this.getHeroes();
+  }
+
+  onSelect(hero: Hero): void {
+    this.selectedHero = hero;
+    this.messageService.add(`HeroesComponent: Selected hero id=${hero.id}`);
+  }
+
+  getHeroes(): void {
+    this.heroService.getHeroes()
+        .subscribe(heroes => this.heroes = heroes);
+  }
+}
+```
+
+
+https://angular.io/tutorial/toh-pt4
