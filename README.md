@@ -27,6 +27,7 @@ Run `ng e2e` to execute the end-to-end tests via a platform of your choice. To u
 To get more help on the Angular CLI use `ng help` or go check out the [Angular CLI Overview and Command Reference](https://angular.io/cli) page.
 
 # Tutorial Steps
+(https://angular.io/tutorial/toh-pt1)
 ### Change the application title
 app.component.ts (class title property) |
 --- |
@@ -538,5 +539,148 @@ export class HeroesComponent implements OnInit {
 }
 ```
 
+### Add navigation with routing
 
-https://angular.io/tutorial/toh-pt4
+- Add a Dashboard view.
+- Add the ability to navigate between the Heroes and Dashboard views.
+- When users click a hero name in either view, navigate to a detail view of the selected hero.
+- When users click a deep link in an email, open the detail view for a particular hero.
+
+### Add the AppRoutingModule
+`$ ng generate module app-routing --flat --module=app`
+```
+--flat puts the file in src/app instead of its own folder.
+--module=app tells the CLI to register it in the imports array of the AppModule.
+```
+
+src/app/app-routing.module.ts (updated) |
+--- |
+```
+import { NgModule } from '@angular/core';
+import { RouterModule, Routes } from '@angular/router';
+import { HeroesComponent } from './heroes/heroes.component';
+
+const routes: Routes = [
+  { path: 'heroes', component: HeroesComponent }
+];
+
+@NgModule({
+  imports: [RouterModule.forRoot(routes)],
+  exports: [RouterModule]
+})
+export class AppRoutingModule { }
+```
+***
+A typical Angular Route has two properties:
+
+- path: a string that matches the URL in the browser address bar.
+- component: the component that the router should create when navigating to this route.
+```
+const routes: Routes = [
+  { path: 'heroes', component: HeroesComponent }
+];
+```
+***
+
+### Add RouterOutlet
+src/app/app.component.html (router-outlet) |
+--- |
+```
+<h1>{{title}}</h1>
+<router-outlet></router-outlet>
+<app-messages></app-messages>
+```
+The `AppComponent` template no longer needs `<app-heroes>` because the application will only display the `HeroesComponent` when the user navigates to it.
+
+### Add a navigation link (routerLink)
+Add a `<nav>` element and, within that, an anchor element that, when clicked, triggers navigation to the `HeroesComponent`.
+src/app/app.component.html (heroes RouterLink) |
+--- |
+```
+<h1>{{title}}</h1>
+<nav>
+  <a routerLink="/heroes">Heroes</a>
+</nav>
+<router-outlet></router-outlet>
+<app-messages></app-messages>
+```
+
+### Add a dashboard view
+Add a `DashboardComponent` using the CLI:
+`$ ng generate component dashboard`
+src/app/dashboard/dashboard.component.html |
+--- |
+```
+<h2>Top Heroes</h2>
+<div class="heroes-menu">
+  <a *ngFor="let hero of heroes">
+    {{hero.name}}
+  </a>
+</div>
+```
+src/app/dashboard/dashboard.component.ts |
+--- |
+```
+import { Component, OnInit } from '@angular/core';
+import { Hero } from '../hero';
+import { HeroService } from '../hero.service';
+
+@Component({
+  selector: 'app-dashboard',
+  templateUrl: './dashboard.component.html',
+  styleUrls: [ './dashboard.component.css' ]
+})
+export class DashboardComponent implements OnInit {
+  heroes: Hero[] = [];
+
+  constructor(private heroService: HeroService) { }
+
+  ngOnInit() {
+    this.getHeroes();
+  }
+
+  getHeroes(): void {
+    this.heroService.getHeroes()
+      .subscribe(heroes => this.heroes = heroes.slice(1, 5));
+      //returning only four of the Top Heroes (2nd, 3rd, 4th, and 5th).
+  }
+}
+```
+### Add the dashboard route
+To navigate to the dashboard, the router needs an appropriate route.
+
+src/app/app-routing.module.ts |
+--- |
+```
+...
+import { DashboardComponent } from './dashboard/dashboard.component';
+...
+{ path: 'dashboard', component: DashboardComponent },
+
+```
+
+### Add a default route
+`{ path: '', redirectTo: '/dashboard', pathMatch: 'full' },`
+This route redirects a URL that fully matches the empty path to the route whose path is `'/dashboard'`
+
+### Add dashboard link to the shell
+The user should be able to navigate back and forth between the `DashboardComponent` and the `HeroesComponent` by clicking links in the navigation area near the top of the page.
+
+src/app/app.component.html |
+--- |
+```
+<h1>{{title}}</h1>
+<nav>
+  <a routerLink="/dashboard">Dashboard</a>
+  <a routerLink="/heroes">Heroes</a>
+</nav>
+<router-outlet></router-outlet>
+<app-messages></app-messages>
+```
+
+### Navigating to hero details
+- By clicking a hero in the dashboard.
+- By clicking a hero in the heroes list.
+- By pasting a "deep link" URL into the browser address bar that identifies the hero to display.
+
+https://angular.io/tutorial/toh-pt5
