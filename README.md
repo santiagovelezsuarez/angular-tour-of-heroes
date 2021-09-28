@@ -682,5 +682,368 @@ src/app/app.component.html |
 - By clicking a hero in the dashboard.
 - By clicking a hero in the heroes list.
 - By pasting a "deep link" URL into the browser address bar that identifies the hero to display.
+  
+
+### Get data from a server
+In this tutorial, you'll add the following data persistence features with help from Angular's HttpClient.
 
 https://angular.io/tutorial/toh-pt5
+
+### Enable HTTP services
+`HttpClient` is Angular's mechanism for communicating with a remote server over HTTP.
+
+Make `HttpClient` available everywhere in the application in two steps. First, add it to the root `AppModule` by importing it:
+
+src/app/app.module.ts (HttpClientModule import) |
+--- |
+```
+import { HttpClientModule } from '@angular/common/http';
+```
+Next, still in the AppModule, add HttpClientModule to the imports array:
+src/app/app.module.ts (imports array excerpt) |
+--- |
+```
+@NgModule({
+  imports: [
+    HttpClientModule,
+  ],
+})
+```
+### Simulate a data server
+This tutorial sample mimics communication with a remote data server by using the In-memory Web API module.
+
+After installing the module, the application will make requests to and receive responses from the `HttpClient` without knowing that the In-memory Web API is intercepting those requests, applying them to an in-memory data store, and returning simulated responses.
+
+By using the In-memory Web API, you won't have to set up a server to learn about `HttpClient`.
+
+`$ npm install angular-in-memory-web-api --save`
+(https://angular.io/tutorial/toh-pt6)
+
+### Heroes and HTTP
+In the HeroService, import HttpClient and HttpHeaders:
+src/app/hero.service.ts (import HTTP symbols) |
+--- |
+```
+import { HttpClient, HttpHeaders } from '@angular/common/http';
+...
+private heroesUrl = 'api/heroes';  // URL to web api
+constructor(
+  private http: HttpClient,
+  private messageService: MessageService) { }
+
+  /** Log a HeroService message with the MessageService */
+  private log(message: string) {
+    this.messageService.add(`HeroService: ${message}`);
+  }
+
+  /** GET heroes from the server */
+  getHeroes(): Observable<Hero[]> {
+    return this.http.get<Hero[]>(this.heroesUrl)
+  }
+```
+`HttpClient.get()` returns the body of the response as an untyped JSON object by default. Applying the optional type specifier, `<Hero[]>` , adds TypeScript capabilities, which reduce errors during compile time.
+
+The server's data API determines the shape of the JSON data. The Tour of Heroes data API returns the hero data as an array.
+
+### Error handling
+Things go wrong, especially when you're getting data from a remote server. The `HeroService.getHeroes()` method should catch errors and do something appropriate.
+
+To catch errors, you **"pipe"** the observable result from `http.get()` through an RxJS `catchError()` operator.
+
+Import the `catchError` symbol from `rxjs/operators`, along with some other operators you'll need later.
+src/app/hero.service.ts |
+--- |
+```
+...
+import { catchError, map, tap } from 'rxjs/operators';
+...
+getHeroes(): Observable<Hero[]> {
+  return this.http.get<Hero[]>(this.heroesUrl)
+    .pipe(
+      catchError(this.handleError<Hero[]>('getHeroes', []))
+    );
+}
+
+...
+
+getHeroes(): Observable<Hero[]> {
+  return this.http.get<Hero[]>(this.heroesUrl)
+    .pipe(
+      tap(_ => this.log('fetched heroes')),
+      catchError(this.handleError<Hero[]>('getHeroes', []))
+    );
+}
+
+...
+
+/**
+ * Handle Http operation that failed.
+ * Let the app continue.
+ * @param operation - name of the operation that failed
+ * @param result - optional value to return as the observable result
+ */
+private handleError<T>(operation = 'operation', result?: T) {
+  return (error: any): Observable<T> => {
+
+    // TODO: send the error to remote logging infrastructure
+    console.error(error); // log to console instead
+
+    // TODO: better job of transforming error for user consumption
+    this.log(`${operation} failed: ${error.message}`);
+
+    // Let the app keep running by returning an empty result.
+    return of(result as T);
+  };
+}
+```
+The `HeroService` methods will **tap** into the flow of observable values and send a message, using the `log()` method, to the message area at the bottom of the page.
+
+### Get hero by id
+
+src/app/hero.service.ts |
+--- |
+```
+/** GET hero by id. Will 404 if id not found */
+getHero(id: number): Observable<Hero> {
+  const url = `${this.heroesUrl}/${id}`;
+  return this.http.get<Hero>(url).pipe(
+    tap(_ => this.log(`fetched hero id=${id}`)),
+    catchError(this.handleError<Hero>(`getHero id=${id}`))
+  );
+}
+```
+### Update heroes
+src/app/hero-detail/hero-detail.component.html (save) |
+--- |
+```
+<button (click)="save()">save</button>
+```
+
+src/app/hero-detail/hero-detail.component.ts (save) |
+--- |
+```
+save(): void {
+  if (this.hero) {
+    this.heroService.updateHero(this.hero)
+      .subscribe(() => this.goBack());
+  }
+}
+```
+src/app/hero.service.ts (update) |
+--- |
+```
+...
+httpOptions = {
+  headers: new HttpHeaders({ 'Content-Type': 'application/json' })
+};
+...
+/** PUT: update the hero on the server */
+updateHero(hero: Hero): Observable<any> {
+  return this.http.put(this.heroesUrl, hero, this.httpOptions).pipe(
+    tap(_ => this.log(`updated hero id=${hero.id}`)),
+    catchError(this.handleError<any>('updateHero'))
+  );
+}
+```
+
+### Add a new hero
+To add a hero, this application only needs the hero's name. You can use an `<input>` element paired with an add button.
+src/app/heroes/heroes.component.html (add) |
+--- |
+```
+<div>
+  <label for="new-hero">Hero name: </label>
+  <input id="new-hero" #heroName />
+
+  <!-- (click) passes input value to add() and then clears the input -->
+  <button class="add-button" (click)="add(heroName.value); heroName.value=''">
+    Add hero
+  </button>
+</div>
+```
+
+src/app/heroes/heroes.component.ts (add) |
+--- |
+```
+add(name: string): void {
+  name = name.trim();
+  if (!name) { return; }
+  this.heroService.addHero({ name } as Hero)
+    .subscribe(hero => {
+      this.heroes.push(hero);
+    });
+}
+```
+
+src/app/hero.service.ts (addHero) |
+--- |
+```
+/** POST: add a new hero to the server */
+addHero(hero: Hero): Observable<Hero> {
+  return this.http.post<Hero>(this.heroesUrl, hero, this.httpOptions).pipe(
+    tap((newHero: Hero) => this.log(`added hero w/ id=${newHero.id}`)),
+    catchError(this.handleError<Hero>('addHero'))
+  );
+}
+```
+`addHero()` differs from `updateHero()` in two ways:
+
+- It calls HttpClient.post() instead of put().
+- It expects the server to generate an id for the new hero, which it returns in the Observable<Hero> to the caller.
+
+### Delete a hero
+Each hero in the heroes list should have a delete button.
+
+Add the following button element to the `HeroesComponent` template, after the hero name in the repeated `<li>` element.
+
+src/app/heroes/heroes.component.html |
+--- |
+```
+<button class="delete" title="delete hero"
+  (click)="delete(hero)">x</button>
+```
+
+Add the `delete()` handler to the component class.
+src/app/heroes/heroes.component.ts (delete) |
+--- |
+```
+delete(hero: Hero): void {
+  this.heroes = this.heroes.filter(h => h !== hero);
+  this.heroService.deleteHero(hero.id).subscribe();
+}
+```
+
+Next, add a `deleteHero()` method to HeroService like this.
+src/app/hero.service.ts (delete) |
+--- |
+```
+/** DELETE: delete the hero from the server */
+deleteHero(id: number): Observable<Hero> {
+  const url = `${this.heroesUrl}/${id}`;
+
+  return this.http.delete<Hero>(url, this.httpOptions).pipe(
+    tap(_ => this.log(`deleted hero id=${id}`)),
+    catchError(this.handleError<Hero>('deleteHero'))
+  );
+}
+```
+
+### Search by name
+In this last exercise, you learn to chain Observable operators together so you can minimize the number of similar HTTP requests and consume network bandwidth economically.
+Start by adding a `searchHeroes()` method to the `HeroService`.
+src/app/hero.service.ts |
+--- |
+```
+/* GET heroes whose name contains search term */
+searchHeroes(term: string): Observable<Hero[]> {
+  if (!term.trim()) {
+    // if not search term, return empty hero array.
+    return of([]);
+  }
+  return this.http.get<Hero[]>(`${this.heroesUrl}/?name=${term}`).pipe(
+    tap(x => x.length ?
+       this.log(`found heroes matching "${term}"`) :
+       this.log(`no heroes matching "${term}"`)),
+    catchError(this.handleError<Hero[]>('searchHeroes', []))
+  );
+}
+```
+### Add search to the Dashboard
+src/app/dashboard/dashboard.component.html |
+--- |
+```
+<h2>Top Heroes</h2>
+<div class="heroes-menu">
+  <a *ngFor="let hero of heroes"
+      routerLink="/detail/{{hero.id}}">
+      {{hero.name}}
+  </a>
+</div>
+
+<app-hero-search></app-hero-search>
+```
+
+`$ ng generate component hero-search`
+src/app/hero-search/hero-search.component.html |
+--- |
+```
+<div id="search-component">
+  <label for="search-box">Hero Search</label>
+  <input #searchBox id="search-box" (input)="search(searchBox.value)" />
+
+  <ul class="search-result">
+    <li *ngFor="let hero of heroes$ | async" >
+      <a routerLink="/detail/{{hero.id}}">
+        {{hero.name}}
+      </a>
+    </li>
+  </ul>
+</div>
+```
+The `*ngFor` repeats hero objects. Notice that the `*ngFor` iterates over a list called `heroes$`, not `heroes`. The `$` is a convention that indicates `heroes$` is an `Observable`, not an array.
+```
+<li *ngFor="let hero of heroes$ | async" >
+```
+Since `*ngFor` can't do anything with an Observable, use the pipe `character (|)` followed by async. This identifies Angular's `AsyncPipe` and subscribes to an `Observable` automatically so you won't have to do so in the component class.
+
+src/app/hero-search/hero-search.component.ts |
+--- |
+```
+import { Component, OnInit } from '@angular/core';
+
+import { Observable, Subject } from 'rxjs';
+
+import {
+   debounceTime, distinctUntilChanged, switchMap
+ } from 'rxjs/operators';
+
+import { Hero } from '../hero';
+import { HeroService } from '../hero.service';
+
+@Component({
+  selector: 'app-hero-search',
+  templateUrl: './hero-search.component.html',
+  styleUrls: [ './hero-search.component.css' ]
+})
+export class HeroSearchComponent implements OnInit {
+  heroes$!: Observable<Hero[]>;
+  private searchTerms = new Subject<string>();
+
+  constructor(private heroService: HeroService) {}
+
+  // Push a search term into the observable stream.
+  search(term: string): void {
+    this.searchTerms.next(term);
+  }
+
+  ngOnInit(): void {
+    this.heroes$ = this.searchTerms.pipe(
+      // wait 300ms after each keystroke before considering the term
+      debounceTime(300),
+
+      // ignore new term if same as previous term
+      distinctUntilChanged(),
+
+      // switch to new search observable each time the term changes
+      switchMap((term: string) => this.heroService.searchHeroes(term)),
+    );
+  }
+}
+```
+A `Subject` is both a source of `observable` values and an `Observable itself`. You can subscribe to a Subject as you would any Observable.
+
+The event binding to the textbox's input event calls the search() method.
+src/app/hero-search/hero-search.component.html |
+--- |
+```
+<input #searchBox id="search-box" (input)="search(searchBox.value)" />
+```
+Every time the user types in the textbox, the binding calls `search()` with the textbox value, a "search term". The `searchTerms` becomes an `Observable` emitting a steady stream of search terms.
+
+Each operator works as follows:
+
+* debounceTime(300) waits until the flow of new string events pauses for 300 milliseconds before passing along the latest string. You'll never make requests more frequently than 300ms.
+
+* distinctUntilChanged() ensures that a request is sent only if the filter text changed.
+
+* switchMap() calls the search service for each search term that makes it through debounce() and distinctUntilChanged(). It cancels and discards previous search observables, returning only the latest search service observable.
